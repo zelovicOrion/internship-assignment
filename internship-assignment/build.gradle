@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.11'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openapi.generator' version '7.14.0'
 }
 
 group = 'com.temenos'
@@ -23,6 +24,31 @@ configurations {
 repositories {
 	mavenCentral()
 }
+openApiGenerate {
+	generatorName = "spring"
+	inputSpec = "$projectDir/src/main/resources/openapi/api.yaml"
+	outputDir = "${project.layout.buildDirectory.get()}/generated-sources"
+	apiPackage = "com.temenos.internship.assignment.api"
+	modelPackage = "com.temenos.internship.assignment.model"
+	configOptions = [
+			reactive       : "true",
+			interfaceOnly  : "true",
+			useSpringBoot3 : "true",
+			useTags        : "true",
+			openApiNullable: "false"
+	]
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir "${project.layout.buildDirectory.get()}/generated-sources/src/main/java"
+		}
+	}
+}
+
+compileJava.dependsOn tasks.openApiGenerate
+
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -35,11 +61,17 @@ dependencies {
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
 
+	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+	implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.6'
+	implementation 'jakarta.validation:jakarta.validation-api'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'io.projectreactor:reactor-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
 }
 
 tasks.named('test') {
