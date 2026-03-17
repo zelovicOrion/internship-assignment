@@ -44,20 +44,25 @@ public class TimerController implements TimerApi {
     @Override
     public Mono<ResponseEntity<Flux<Timer>>> getAllTimers(
             ServerWebExchange exchange) {
-        return Mono.empty();
+        logger.debug("GET /api/timers - getAllTimers called");
+        return Mono.just(ResponseEntity.ok(timerService.getAllTimers()));
     }
 
     @Override
     public Mono<ResponseEntity<Timer>> getTimerById(
             String timerId,
             ServerWebExchange exchange) {
-        return Mono.empty();
+        logger.debug("GET /api/timers/{} - getTimerById called", timerId);
+        return timerService.getTimerById(timerId)
+                .map(ResponseEntity::ok);
     }
 
     @Override
     public Mono<ResponseEntity<Void>> deleteTimer(
             String timerId,
             ServerWebExchange exchange) {
-        return Mono.empty();
+        logger.debug("DELETE /api/timers/{} - deleteTimer called", timerId);
+        return timerService.deleteTimer(timerId)
+                .map(ResponseEntity::ok);
     }
 }
