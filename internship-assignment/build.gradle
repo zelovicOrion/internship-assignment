@@ -28,6 +28,7 @@ openApiGenerate {
 	generatorName = "spring"
 	inputSpec = "$projectDir/src/main/resources/openapi/api.yaml"
 	outputDir = "${project.layout.buildDirectory.get()}/generated-sources"
+	templateDir = "$projectDir/src/main/resources/templates"  // ← add this
 	apiPackage = "com.temenos.internship.assignment.api"
 	modelPackage = "com.temenos.internship.assignment.model"
 	configOptions = [
