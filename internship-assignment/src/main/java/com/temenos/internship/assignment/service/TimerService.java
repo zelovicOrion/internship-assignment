@@ -28,7 +28,8 @@ public class TimerService {
         entity.setDelay(request.getDelay());
 
         return timerRepository.save(entity)
-                .map(this::toModel);
+                .map(this::toModel)
+                .doOnSuccess(timer -> logger.debug("Timer created: {}", timer.toJson()));
     }
 
     public Flux<Timer> getAllTimers() {
