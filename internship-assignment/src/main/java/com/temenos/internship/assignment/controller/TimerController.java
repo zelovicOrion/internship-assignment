@@ -55,6 +55,8 @@ public class TimerController implements TimerApi {
                         timer.setTimerId(streamRequest.timerId());
                         timer.setDelay(streamRequest.delay());
                         timer.setCreatedAt(streamRequest.createdAt());
+                        timer.setCallbackUrl(streamRequest.callbackUrl());
+                        timer.setCsrfToken(streamRequest.csrfToken());
                         return ResponseEntity
                                 .status(HttpStatus.CREATED)
                                 .body(timer);

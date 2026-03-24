@@ -84,10 +84,12 @@ public class TimerService {
         String timerId = (String) values.get("timerId");
         int delay = Integer.parseInt((String) values.get("delay"));
         long createdAt = Long.parseLong((String) values.get("createdAt"));
+        String callbackUrl = (String) values.get("callbackUrl");
+        String csrfToken = (String) values.get("csrfToken");
 
         logger.debug("Processing timer {}", timerId);
 
-        return saveAndSchedule(timerId, delay, createdAt)
+        return saveAndSchedule(timerId, delay, createdAt, callbackUrl, csrfToken)
                 .then(redisTemplate.opsForStream()
                         .acknowledge(
                                 REQUEST_STREAM,
@@ -98,31 +100,58 @@ public class TimerService {
     private Mono<Void> saveAndSchedule(
             String timerId,
             int delay,
-            long createdAt) {
-
+            long createdAt,
+            String callbackUrl,
+            String csrfToken
+    ) {
         TimerEntity entity = buildEntity(
                 UUID.fromString(timerId),
                 delay,
-                createdAt
+                createdAt,
+                callbackUrl,
+                csrfToken
         );
 
         if (isShortTimer(delay)) {
-            entity.setStatus(TimerStatus.SCHEDULED);
+
+            entity.setStatus(TimerStatus.PENDING);
+
             return timerRepository.save(entity)
-                    .doOnSuccess(saved -> {
-                        timerQueueService.scheduleTimer(
-                                timerId, delay, createdAt);
+                    .flatMap(saved -> {
                         logger.debug(
-                                "Short timer {} scheduled", timerId);
+                                "Timer {} inserted with PENDING status",
+                                timerId
+                        );
+
+                        timerQueueService.scheduleTimer(
+                                timerId,
+                                delay,
+                                createdAt
+                        );
+
+                        return timerRepository.updateStatus(
+                                saved.getTimerId(),
+                                TimerStatus.SCHEDULED
+                        );
                     })
+                    .doOnSuccess(v ->
+                            logger.debug(
+                                    "Timer {} scheduled and marked as SCHEDULED",
+                                    timerId
+                            )
+                    )
                     .then();
         }
 
         entity.setStatus(TimerStatus.STORED);
+
         return timerRepository.save(entity)
                 .doOnSuccess(saved ->
                         logger.debug(
-                                "Long timer {} stored", timerId))
+                                "Long timer {} stored in DB",
+                                timerId
+                        )
+                )
                 .then();
     }
 
@@ -143,12 +172,15 @@ public class TimerService {
         return timerRepository.deleteById(UUID.fromString(timerId));
     }
 
-    private TimerEntity buildEntity(UUID timerId, int delay, long createdAt) {
+    private TimerEntity buildEntity(UUID timerId, int delay, long createdAt,
+          String callbackUrl, String csrfToken){
         TimerEntity entity = new TimerEntity();
         entity.setTimerId(timerId);
         entity.setDelay(delay);
         entity.setCreated(createdAt);
         entity.setFailCount(0);
+        entity.setCallbackUrl(callbackUrl);
+        entity.setCsrfToken(csrfToken);
         return entity;
     }
     private boolean isShortTimer(int delay) {
@@ -162,6 +194,8 @@ public class TimerService {
         timer.setDelay(entity.getDelay());
         timer.setStatus(TimerStatus.valueOf(entity.getStatus().name()));
         timer.setFailCount(entity.getFailCount());
+        entity.setCallbackUrl(entity.getCallbackUrl());
+        entity.setCsrfToken(entity.getCsrfToken());
         return timer;
     }
 

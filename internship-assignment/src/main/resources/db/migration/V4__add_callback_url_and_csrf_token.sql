@@ -1,0 +1,2 @@
+ALTER TABLE timer ADD COLUMN callback_url VARCHAR(500);
+ALTER TABLE timer ADD COLUMN csrf_token VARCHAR(255);

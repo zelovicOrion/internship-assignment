@@ -12,7 +12,9 @@ public class TimerRequestBuilder {
         return new TimerStreamRequest(
                 UUID.randomUUID().toString(),
                 request.getDelay(),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                request.getCallbackUrl(),
+                request.getCsrfToken()
         );
     }
 }
