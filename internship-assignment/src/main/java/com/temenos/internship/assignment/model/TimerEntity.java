@@ -25,6 +25,11 @@ public class TimerEntity implements Persistable<UUID> {
     private Integer failCount;
     @Column("status")
     private TimerStatus status;
+    @Column("callback_url")
+    private String callbackUrl;
+
+    @Column("csrf_token")
+    private String csrfToken;
 
     @Transient
     private boolean isNew = true;

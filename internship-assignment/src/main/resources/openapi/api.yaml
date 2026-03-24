@@ -149,6 +149,10 @@ components:
       properties:
         delay:
           $ref: '#/components/schemas/TimerDelay'
+        callbackUrl:
+          $ref: '#/components/schemas/TimerCallbackUrl'
+        csrfToken:
+          $ref: '#/components/schemas/TimerCsrfToken'
 
     Timer:
       type: object
@@ -163,6 +167,10 @@ components:
           $ref: '#/components/schemas/TimerStatus'
         failCount:
           $ref: '#/components/schemas/TimerFailCount'
+        callbackUrl:
+          $ref: '#/components/schemas/TimerCallbackUrl'
+        csrfToken:
+          $ref: '#/components/schemas/TimerCsrfToken'
 
     TimerCreatedAt:
       type: integer
@@ -184,6 +192,7 @@ components:
       readOnly: true
       description: Current status of the timer
       enum:
+        - PENDING
         - SCHEDULED
         - STORED
         - PROCESSING
@@ -197,6 +206,16 @@ components:
       description: Number of failed processing attempts
       minimum: 0
       example: 0
+
+    TimerCallbackUrl:
+      type: string
+      description: URL to call when the timer expires
+      example: "http://localhost:8080/callback"
+
+    TimerCsrfToken:
+      type: string
+      description: CSRF token included in the callback request body
+      example: "my-secret-token-123"
 
     ErrorResponse:
       type: object

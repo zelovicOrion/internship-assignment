@@ -1,5 +1,7 @@
 package com.temenos.internship.assignment.service;
 
+import com.temenos.internship.assignment.model.Timer;
+import com.temenos.internship.assignment.model.TimerEntity;
 import com.temenos.internship.assignment.model.TimerStatus;
 import com.temenos.internship.assignment.repository.TimerRepository;
 import jakarta.annotation.PreDestroy;
@@ -10,6 +12,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Qualifier;
 
@@ -25,18 +28,20 @@ public class TimerConsumerService {
     private final TimerRepository timerRepository;
 
     private final TaskExecutor taskExecutor;
-
+    private final WebClient webClient;
     private final AtomicBoolean running = new AtomicBoolean(true);
 
 
     public TimerConsumerService(
             TimerQueueService timerQueueService,
             TimerRepository timerRepository,
-            @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor
+            @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
+            WebClient webClient
     ) {
         this.timerQueueService = timerQueueService;
         this.timerRepository = timerRepository;
         this.taskExecutor = taskExecutor;
+        this.webClient = webClient;
     }
 
 
@@ -62,17 +67,26 @@ public class TimerConsumerService {
 
     }
 
+
     private void processTimer(String timerId) {
         UUID id = UUID.fromString(timerId);
 
         timerRepository.updateStatus(id, TimerStatus.PROCESSING)
-                .flatMap(rows -> {
-                    logger.debug("Timer {} set to PROCESSING", timerId);
+                .then(timerRepository.findById(id))
+                .switchIfEmpty(Mono.error(
+                        new IllegalStateException("Timer not found: " + timerId)))
+                .flatMap(entity -> {
+                    Timer timer = toModel(entity);
+
                     return doWork(timerId)
+                            .then(sendCallback(timer))
                             .then(timerRepository.updateStatus(
                                     id, TimerStatus.COMPLETED))
-                            .doOnSuccess(r ->
-                                    logger.debug("Timer {} COMPLETED", timerId));
+                            .doOnSuccess(v ->
+                                    logger.info(
+                                            "Timer {} COMPLETED and callback sent",
+                                            timerId
+                                    ));
                 })
                 .onErrorResume(error -> {
                     logger.error("Timer {} failed", timerId, error);
@@ -81,11 +95,46 @@ public class TimerConsumerService {
                 .subscribe();
     }
 
+    private Mono<Void> sendCallback(Timer timer) {
+        return webClient.post()
+                .uri(timer.getCallbackUrl())
+                .bodyValue(timer)
+                .retrieve()
+                .toBodilessEntity()
+                .doOnSuccess(response ->
+                        logger.info(
+                                "Callback sent successfully for timer {} with status {}",
+                                timer.getTimerId(),
+                                response.getStatusCode()
+                        )
+                )
+                .doOnError(error ->
+                        logger.error(
+                                "Callback failed for timer {}",
+                                timer.getTimerId(),
+                                error
+                        )
+                )
+                .then();
+    }
+
 
 
     private Mono<Void> doWork(String timerId) {
         logger.debug("Executing work for timer {}", timerId);
         return Mono.delay(Duration.ofSeconds(5)).then();
+    }
+
+    private Timer toModel(TimerEntity entity) {
+        Timer timer = new Timer();
+        timer.setTimerId(entity.getTimerId().toString());
+        timer.setCreatedAt(entity.getCreated());
+        timer.setDelay(entity.getDelay());
+        timer.setStatus(TimerStatus.valueOf(entity.getStatus().name()));
+        timer.setFailCount(entity.getFailCount());
+        timer.setCallbackUrl(entity.getCallbackUrl());
+        timer.setCsrfToken(entity.getCsrfToken());
+        return timer;
     }
 
     @PreDestroy
