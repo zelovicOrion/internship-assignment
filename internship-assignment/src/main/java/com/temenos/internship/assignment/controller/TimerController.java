@@ -1,7 +1,9 @@
 package com.temenos.internship.assignment.controller;
 
 import com.temenos.internship.assignment.service.TimerService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,15 +17,17 @@ import com.temenos.internship.assignment.api.TimerApi;
 import com.temenos.internship.assignment.model.Timer;
 import com.temenos.internship.assignment.model.TimerRequest;
 
+import java.util.Map;
+import java.util.UUID;
+
 @RestController
+@RequiredArgsConstructor
 public class TimerController implements TimerApi {
 
     private static final Logger logger = LoggerFactory.getLogger(TimerController.class);
     private final TimerService timerService;
-
-    public TimerController(TimerService timerService) {
-        this.timerService = timerService;
-    }
+    private final ReactiveRedisTemplate<String, String> redisTemplate;
+    private static final String REQUEST_STREAM = "timer-requests";
 
     @GetMapping("/test")
     Mono<ResponseEntity<String>> test() {
@@ -35,10 +39,27 @@ public class TimerController implements TimerApi {
     public Mono<ResponseEntity<Timer>> createTimer(
             Mono<TimerRequest> timerRequest,
             ServerWebExchange exchange) {
-        logger.debug("POST /api/timers - createTimer called");
-        return timerRequest
-                .flatMap(timerService::createTimer)
-                .map(timer -> ResponseEntity.status(HttpStatus.CREATED).body(timer));
+
+        return timerRequest.flatMap(request -> {
+            String timerId = UUID.randomUUID().toString();
+            long createdAt = System.currentTimeMillis();
+
+            logger.debug("Publishing timer {} to request stream", timerId);
+
+            return redisTemplate.opsForStream()
+                    .add(REQUEST_STREAM, Map.of(
+                            "timerId", timerId,
+                            "delay", String.valueOf(request.getDelay()),
+                            "createdAt", String.valueOf(createdAt)
+                    ))
+                    .map(recordId -> {
+                        Timer timer = new Timer();
+                        timer.setTimerId(timerId);
+                        timer.setDelay(request.getDelay());
+                        timer.setCreatedAt(createdAt);
+                        return ResponseEntity.status(HttpStatus.CREATED).body(timer);
+                    });
+        });
     }
 
     @Override

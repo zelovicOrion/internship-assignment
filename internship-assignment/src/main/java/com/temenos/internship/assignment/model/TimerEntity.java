@@ -21,6 +21,10 @@ public class TimerEntity implements Persistable<UUID> {
 
     @Column("delay")
     private Integer delay;
+    @Column("fail_count")
+    private Integer failCount;
+    @Column("status")
+    private TimerStatus status;
 
     @Transient
     private boolean isNew = true;

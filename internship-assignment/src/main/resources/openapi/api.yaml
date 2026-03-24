@@ -159,6 +159,10 @@ components:
           $ref: '#/components/schemas/TimerCreatedAt'
         delay:
           $ref: '#/components/schemas/TimerDelay'
+        status:
+          $ref: '#/components/schemas/TimerStatus'
+        failCount:
+          $ref: '#/components/schemas/TimerFailCount'
 
     TimerCreatedAt:
       type: integer
@@ -174,6 +178,25 @@ components:
       minimum: 1
       maximum: 604800
       example: 3600
+
+    TimerStatus:
+      type: string
+      readOnly: true
+      description: Current status of the timer
+      enum:
+        - SCHEDULED
+        - STORED
+        - PROCESSING
+        - COMPLETED
+        - FAILED
+      example: "SCHEDULED"
+
+    TimerFailCount:
+      type: integer
+      readOnly: true
+      description: Number of failed processing attempts
+      minimum: 0
+      example: 0
 
     ErrorResponse:
       type: object

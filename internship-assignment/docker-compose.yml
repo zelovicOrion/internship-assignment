@@ -5,7 +5,7 @@ services:
     image: postgres:16
     container_name: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_DB: assignment_db
       POSTGRES_USER: ${DB_USERNAME}
@@ -50,6 +50,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./logs:/app/logs   # maps host ./logs to container /app/logs
 
 volumes:
   postgres_data:
