@@ -3,10 +3,8 @@ package com.temenos.internship.assignment.service;
 import com.temenos.internship.assignment.config.TimerProperties;
 import com.temenos.internship.assignment.model.Timer;
 import com.temenos.internship.assignment.model.TimerEntity;
-import com.temenos.internship.assignment.model.TimerRequest;
 import com.temenos.internship.assignment.model.TimerStatus;
 import com.temenos.internship.assignment.repository.TimerRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,9 +37,6 @@ public class TimerService {
 
     private final ReactiveRedisTemplate<String, String> redisTemplate;
 
-
-
-
     @EventListener(ApplicationReadyEvent.class)
     public void startStreamListener() {
         createConsumerGroupIfNeeded()
@@ -63,7 +58,7 @@ public class TimerService {
                     logger.debug("Consumer group already exists");
                     return Mono.empty();
                 })
-                .then(); // ✅ converts Mono<String> → Mono<Void>
+                .then();
     }
 
     private Flux<MapRecord<String, Object, Object>> readStream() {
@@ -78,7 +73,7 @@ public class TimerService {
                                 ReadOffset.lastConsumed()
                         )
                 )
-                .repeat(); // keep listening
+                .repeat();
     }
 
     private Mono<Void> processStreamMessage(
@@ -100,86 +95,6 @@ public class TimerService {
                                 message.getId()))
                 .then();
     }
-
-    private void readFromStream() {
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
-                redisTemplate.opsForStream()
-                        .read(
-                                Consumer.from(GROUP_NAME, consumerName),
-                                StreamReadOptions.empty().count(10),
-                                StreamOffset.create(REQUEST_STREAM, ReadOffset.lastConsumed())
-                        )
-                        .flatMap(this::processStreamMessage)
-                        .blockLast(Duration.ofSeconds(2));
-
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                logger.error("Error reading from request stream", e);
-            }
-        }
-    }
-    /*
-    private Mono<Void> processStreamMessage(
-            MapRecord<String, Object, Object> message) {
-
-        Map<Object, Object> values = message.getValue();
-        String timerId = (String) values.get("timerId");
-        int delay = Integer.parseInt((String) values.get("delay"));
-        long createdAt = Long.parseLong((String) values.get("createdAt"));
-
-        logger.debug("Processing stream message for timer {}", timerId);
-
-        return saveAndSchedule(timerId, delay, createdAt)
-                .then(redisTemplate.opsForStream()
-                        .acknowledge(REQUEST_STREAM, GROUP_NAME, message.getId()))
-                .then();
-    }
-
-    private Mono<Void> saveAndSchedule(String timerId, int delay, long createdAt) {
-        TimerEntity entity = buildEntity(UUID.fromString(timerId), delay, createdAt);
-
-        if (isShortTimer(delay)) {
-            entity.setStatus(TimerStatus.SCHEDULED);
-            return timerRepository.save(entity)
-                    .doOnSuccess(saved -> {
-                        timerQueueService.scheduleTimer(timerId, delay, createdAt);
-                        logger.debug("Short timer {} saved and scheduled", timerId);
-                    })
-                    .then();
-        }
-
-        entity.setStatus(TimerStatus.STORED);
-        return timerRepository.save(entity)
-                .doOnSuccess(saved -> logger.debug("Long timer {} stored in DB", timerId))
-                .then();
-    }*/
-    /*
-    public Mono<Timer> createTimer(TimerRequest request) {
-        logger.debug("Creating timer with delay: {}", request.getDelay());
-
-        long createdAt = System.currentTimeMillis();
-        UUID timerId = UUID.randomUUID();
-
-        TimerEntity entity = buildEntity(timerId, request.getDelay(), createdAt);
-
-        if (isShortTimer(request.getDelay())) {
-            entity.setStatus(TimerStatus.SCHEDULED);
-            return timerRepository.save(entity)
-                    .doOnSuccess(saved -> timerQueueService
-                            .scheduleTimer(timerId.toString(), request.getDelay(), createdAt))
-                    .map(this::toModel)
-                    .doOnSuccess(timer -> logger.debug("Short timer created: {}", timer.toJson()));
-        }
-
-        entity.setStatus(TimerStatus.STORED);
-        return timerRepository.save(entity)
-                .map(this::toModel)
-                .doOnSuccess(timer -> logger.debug("Long timer stored: {}", timer.toJson()));
-    }*/
-
     private Mono<Void> saveAndSchedule(
             String timerId,
             int delay,
@@ -245,7 +160,8 @@ public class TimerService {
         timer.setTimerId(entity.getTimerId().toString());
         timer.setCreatedAt(entity.getCreated());
         timer.setDelay(entity.getDelay());
-        timer.setStatus(TimerStatus.valueOf(entity.getStatus().name()));        timer.setFailCount(entity.getFailCount());
+        timer.setStatus(TimerStatus.valueOf(entity.getStatus().name()));
+        timer.setFailCount(entity.getFailCount());
         return timer;
     }
 
